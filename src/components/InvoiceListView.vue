@@ -240,6 +240,12 @@
             <span class="text-mono text-caption">{{ item.cdc || '-' }}</span>
           </template>
 
+          <template v-slot:item.de="{ item }">
+            <v-chip size="small" variant="outlined" color="primary">
+              {{ item.de || 'Factura electrónica' }}
+            </v-chip>
+          </template>
+
           <template v-slot:item.estado="{ item }">
             <v-chip
               :color="getEstadoVisualColor(item.estadoVisual, item.codigoRetorno, item.estado)"
@@ -370,7 +376,8 @@ export default {
     const searchTypes = [
       { title: 'RUC', value: 'ruc' },
       { title: 'Nombre', value: 'nombre' },
-      { title: 'CDC', value: 'cdc' }
+      { title: 'CDC', value: 'cdc' },
+      { title: 'Tipo', value: 'tipo' }
     ];
 
     const searchTypeLabel = computed(() => {
@@ -390,6 +397,7 @@ export default {
         const ruc = (invoice.cliente?.ruc || '').toLowerCase();
         const nombre = (invoice.cliente?.nombre || '').toLowerCase();
         const cdc = (invoice.cdc || '').toLowerCase();
+        const tipo = (invoice.de || '').toLowerCase();
 
         // Filtrar según el tipo de búsqueda seleccionado
         switch (searchType.value) {
@@ -399,6 +407,8 @@ export default {
             return nombre.includes(searchLower);
           case 'cdc':
             return cdc.includes(searchLower);
+          case 'tipo':
+            return tipo.includes(searchLower);
           default:
             return ruc.includes(searchLower);
         }
@@ -406,14 +416,12 @@ export default {
     });
 
     const headers = [
-      { title: 'Hash', key: 'facturaHash', sortable: false },
       { title: 'RUC', key: 'cliente.ruc' },
-      { title: 'CDC', key: 'cdc' },
       { title: 'Cliente', key: 'cliente.nombre' },
-      { title: 'Total', key: 'total' },
-      { title: 'Estado', key: 'estado' },
-      { title: 'Proceso', key: 'proceso' },
+      { title: 'CDC', key: 'cdc' },
       { title: 'Fecha', key: 'createdAt' },
+      { title: 'Tipo DE', key: 'de' },
+      { title: 'Estado SIFEN', key: 'estado' },
       { title: 'Acciones', key: 'actions', sortable: false }
     ];
 
