@@ -123,8 +123,8 @@
 </template>
 
 <script>
-import { ref, onMounted, reactive, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, onMounted, reactive, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { cerrarSesion } from './auth';
 import EmpresaSelector from './components/EmpresaSelector.vue';
@@ -137,6 +137,7 @@ export default {
   setup() {
     const drawer = ref(null);
     const route = useRoute();
+    const router = useRouter();
     const menu = ref(false);
     const usuario = ref(null);
     const apiConnected = ref(false);
@@ -151,6 +152,17 @@ export default {
 
     // Estado de autenticación
     const autenticado = ref(false);
+
+    // Cargar estado del drawer desde localStorage
+    const drawerSaved = localStorage.getItem('sidebar-drawer');
+    if (drawerSaved !== null) {
+      drawer.value = drawerSaved === 'true';
+    }
+
+    // Guardar estado del drawer en localStorage cuando cambie
+    watch(drawer, (newValue) => {
+      localStorage.setItem('sidebar-drawer', String(newValue));
+    });
 
     // Computed para verificar si es página de login
     const isLoginPage = computed(() => route.path === '/login');
@@ -167,10 +179,15 @@ export default {
       }
     };
 
-    // Cambiar empresa
-    const cambiarEmpresa = (empresaId) => {
-      console.log('Empresa cambiada:', empresaId);
-      // Aquí se puede recargar datos o hacer otras acciones al cambiar de empresa
+    // Cambiar empresa - guardar en localStorage y actualizar URL
+    const cambiarEmpresa = (empresaRuc) => {
+      console.log('Empresa cambiada (RUC):', empresaRuc);
+      localStorage.setItem('filtro-empresa', empresaRuc);
+      // Actualizar query param para que las vistas reaccionen
+      router.replace({ 
+        path: route.path, 
+        query: { ...route.query, empresa: empresaRuc } 
+      }).catch(() => {});
     };
 
     const checkApiConnection = async () => {

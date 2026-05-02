@@ -34,10 +34,10 @@ export function guardarSesion(token, usuario) {
   localStorage.setItem('usuario', JSON.stringify(usuario));
 }
 
-// Guardar empresa activa
-export function guardarEmpresaActiva(empresaId) {
-  state.empresaActiva = empresaId;
-  localStorage.setItem('empresaActiva', empresaId);
+// Guardar empresa activa (RUC del filtro)
+export function guardarEmpresaActiva(empresaRuc) {
+  state.empresaActiva = empresaRuc;
+  localStorage.setItem('empresaActiva', empresaRuc);
 }
 
 // Obtener empresa activa

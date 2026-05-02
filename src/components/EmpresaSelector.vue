@@ -9,8 +9,20 @@
     outlined
     dense
     hide-details
+    clearable
     @update:model-value="cambiarEmpresa"
+    @click:clear="seleccionarTodas"
   >
+    <template #prepend-item>
+      <v-list-item @click="seleccionarTodas" base-color="primary">
+        <v-list-item-title class="d-flex align-center">
+          <v-icon start size="small">mdi-check</v-icon>
+          Todas las empresas
+        </v-list-item-title>
+      </v-list-item>
+      <v-divider class="my-1"></v-divider>
+    </template>
+
     <template #selection="{ item }">
       <div class="d-flex align-center">
         <v-icon start size="small">mdi-office-building</v-icon>
@@ -35,9 +47,9 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
-import { guardarEmpresaActiva, obtenerEmpresaActiva } from '../auth';
+import { guardarEmpresaActiva, obtenerEmpresaActiva, limpiarEmpresaActiva } from '../auth';
 
 export default {
   name: 'EmpresaSelector',
@@ -47,25 +59,25 @@ export default {
     const empresaActiva = ref(null);
     const cargando = ref(false);
 
+    // Computed que agrega "Todas las empresas" como primera opción
+    const empresasConTodas = computed(() => [
+      { _id: null, nombreFantasia: 'Todas las empresas' }
+    ].concat(empresas.value));
+
     const cargarEmpresas = async () => {
       cargando.value = true;
       try {
         const response = await axios.get('/api/empresas');
         empresas.value = response.data.data || [];
         
-        // Restaurar empresa activa guardada
+        // Restaurar empresa activa guardada (formato RUC)
         const guardada = obtenerEmpresaActiva();
-        if (guardada && empresas.value.find(e => e._id === guardada)) {
-          empresaActiva.value = guardada;
-        } else if (empresas.value.length > 0) {
-          // Si no hay una guardada o la guardada ya no existe, usar la primera
-          empresaActiva.value = empresas.value[0]._id;
-          guardarEmpresaActiva(empresaActiva.value);
-        }
-        
-        // Notificar al padre si se cargó una empresa
-        if (empresaActiva.value) {
-          emit('cambio-empresa', empresaActiva.value);
+        console.log('Empresa guardada en localStorage:', guardada);
+        if (guardada === 'all' || guardada === null) {
+          empresaActiva.value = null; // Todas las empresas
+        } else if (guardada && empresas.value.find(e => e.ruc === guardada)) {
+          const empresa = empresas.value.find(e => e.ruc === guardada);
+          empresaActiva.value = empresa._id;
         }
       } catch (error) {
         console.error('Error cargando empresas:', error);
@@ -74,22 +86,34 @@ export default {
       }
     };
 
+    const seleccionarTodas = () => {
+      empresaActiva.value = null;
+      guardarEmpresaActiva('all');
+      emit('cambio-empresa', 'all');
+    };
+
     const cambiarEmpresa = (id) => {
-      guardarEmpresaActiva(id);
-      emit('cambio-empresa', id);
+      if (id === null || id === undefined) {
+        seleccionarTodas();
+        return;
+      }
+      const empresa = empresas.value.find(e => e._id === id);
+      if (empresa) {
+        guardarEmpresaActiva(empresa.ruc);
+        emit('cambio-empresa', empresa.ruc);
+      }
     };
 
     onMounted(() => {
-      // Solo cargar si hay más de una empresa potencial
-      // Si el usuario solo tendrá una empresa, esto puede simplificarse
       cargarEmpresas();
     });
 
     return {
-      empresas,
+      empresas: empresasConTodas,
       empresaActiva,
       cargando,
-      cambiarEmpresa
+      cambiarEmpresa,
+      seleccionarTodas
     };
   }
 };

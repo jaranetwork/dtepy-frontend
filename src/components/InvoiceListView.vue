@@ -347,7 +347,8 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 
 export default {
@@ -373,12 +374,95 @@ export default {
     const deleteInvoiceData = ref(null);
     const clearing = ref(false);
 
+    const route = useRoute();
+    const router = useRouter();
+
     const searchTypes = [
       { title: 'RUC', value: 'ruc' },
       { title: 'Nombre', value: 'nombre' },
       { title: 'CDC', value: 'cdc' },
       { title: 'Tipo', value: 'tipo' }
     ];
+
+    const empresaActiva = ref(null);
+
+    // Sincronizar con localStorage
+    const cargarEmpresaLocalStorage = () => {
+      const guardada = localStorage.getItem('filtro-empresa');
+      if (guardada) {
+        empresaActiva.value = guardada;
+      }
+    };
+
+    // Escuchar cambios en localStorage desde otras pestañas/ventanas
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'empresaActiva') {
+        const guardada = e.newValue;
+        empresaActiva.value = (guardada && guardada !== 'all' && guardada !== 'null') ? guardada : null;
+      }
+    });
+
+// Cargar filtros desde la URL al montar
+    onMounted(() => {
+      const query = route.query;
+      // Priorizar URL params sobre localStorage
+      if (query.empresa) {
+        empresaActiva.value = query.empresa;
+      } else {
+        // Si no hay en URL, cargar desde localStorage
+        const guardada = localStorage.getItem('empresaActiva');
+        empresaActiva.value = (guardada && guardada !== 'all' && guardada !== 'null') ? guardada : null;
+      }
+      if (query.search) search.value = query.search;
+      if (query.searchType) searchType.value = query.searchType;
+      if (query.page) currentPage.value = parseInt(query.page);
+      loadInvoices();
+    });
+
+    // Actualizar URL cuando cambian los filtros
+    const updateUrl = () => {
+      const query = {};
+      if (search.value) query.search = search.value;
+      if (searchType.value) query.searchType = searchType.value;
+      if (empresaActiva.value) query.empresa = empresaActiva.value;
+      if (currentPage.value > 1) query.page = currentPage.value;
+      router.replace({ query }).catch(() => {});
+    };
+
+    // Watch para cambios en filtros - con debounce para evitar recargas excesivas
+    let searchTimeout = null;
+    
+    watch(search, () => {
+      if (searchTimeout) clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        currentPage.value = 1;
+        updateUrl();
+        loadInvoices();
+      }, 300);
+    });
+
+    watch(searchType, () => {
+      currentPage.value = 1;
+      updateUrl();
+      loadInvoices();
+    });
+
+    watch(empresaActiva, () => {
+      currentPage.value = 1;
+      updateUrl();
+      loadInvoices();
+    }, { immediate: false });
+
+    watch(currentPage, () => {
+      updateUrl();
+      loadInvoices();
+    });
+
+    // Escuchar cambios de empresa desde el header (URL)
+    watch(() => route.query.empresa, (newEmpresa) => {
+      // Si es "all" o null, no filtrar por empresa
+      empresaActiva.value = (newEmpresa && newEmpresa !== 'all' && newEmpresa !== 'null') ? newEmpresa : null;
+    });
 
     const searchTypeLabel = computed(() => {
       const type = searchTypes.find(t => t.value === searchType.value);
@@ -387,13 +471,21 @@ export default {
 
     // Propiedad computada para filtrar las facturas
     const filteredInvoices = computed(() => {
+      let result = invoices.value;
+
+      // Filtrar por empresa
+      if (empresaActiva.value) {
+        result = result.filter(invoice => invoice.rucEmpresa === empresaActiva.value);
+      }
+
+      // Filtrar por búsqueda de texto
       if (!search.value) {
-        return invoices.value;
+        return result;
       }
 
       const searchLower = search.value.toLowerCase();
 
-      return invoices.value.filter(invoice => {
+      return result.filter(invoice => {
         const ruc = (invoice.cliente?.ruc || '').toLowerCase();
         const nombre = (invoice.cliente?.nombre || '').toLowerCase();
         const cdc = (invoice.cdc || '').toLowerCase();
@@ -415,15 +507,15 @@ export default {
       });
     });
 
-    const headers = [
-      { title: 'RUC', key: 'cliente.ruc' },
-      { title: 'Cliente', key: 'cliente.nombre' },
-      { title: 'CDC', key: 'cdc' },
-      { title: 'Fecha', key: 'createdAt' },
-      { title: 'Tipo DE', key: 'de' },
-      { title: 'Estado SIFEN', key: 'estado' },
-      { title: 'Acciones', key: 'actions', sortable: false }
-    ];
+     const headers = [
+       { title: 'RUC', key: 'cliente.ruc' },
+       { title: 'Cliente', key: 'cliente.nombre' },
+       { title: 'CDC', key: 'cdc' },
+       { title: 'Fecha', key: 'createdAt' },
+       { title: 'Tipo DE', key: 'de' },
+       { title: 'Estado SIFEN', key: 'estado' },
+       { title: 'Acciones', key: 'actions', sortable: false }
+     ];
 
     const getStatusColor = (status) => {
       switch(status) {
@@ -793,13 +885,18 @@ export default {
 
     const changePage = (page) => {
       currentPage.value = page;
-      loadInvoices();
     };
 
     const loadInvoices = async () => {
       loading.value = true;
       try {
-        const response = await axios.get(`/api/invoices?page=${currentPage.value}&limit=10`);
+        const params = new URLSearchParams();
+        params.append('page', currentPage.value);
+        params.append('limit', '10');
+        if (empresaActiva.value) {
+          params.append('rucEmpresa', empresaActiva.value);
+        }
+        const response = await axios.get(`/api/invoices?${params.toString()}`);
         invoices.value = response.data.invoices;
         totalPages.value = response.data.totalPages;
         totalItems.value = response.data.total;
