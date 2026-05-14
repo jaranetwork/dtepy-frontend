@@ -19,7 +19,7 @@
       <v-col cols="12">
         <v-card>
           <v-card-title>
-            <h2>Detalle de Factura: {{ invoice.correlativo }}</h2>
+            <h2>Detalles Factura ID: {{ invoice.facturaId }}</h2>
             <v-spacer></v-spacer>
             <v-chip
               :color="getStatusColor(invoice.estado)"
@@ -55,6 +55,12 @@
                   <v-card-title class="text-h6">Información de la Factura</v-card-title>
                   <v-card-text>
                     <p><strong>Correlativo:</strong> {{ invoice.correlativo }}</p>
+                    <p>
+                      <strong>Tipo DE:</strong>
+                      <v-chip size="small" variant="outlined" color="primary" class="ml-1">
+                        {{ invoice.de || 'Factura electrónica' }}
+                      </v-chip>
+                    </p>
                     <p><strong>Total:</strong> Gs. {{ formatCurrency(invoice.total) }}</p>
                     <p><strong>Fecha de Creación:</strong> {{ formatDate(invoice.fechaCreacion) }}</p>
                     <p v-if="invoice.fechaEnvio"><strong>Fecha de Envío:</strong> {{ formatDate(invoice.fechaEnvio) }}</p>

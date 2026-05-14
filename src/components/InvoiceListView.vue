@@ -226,10 +226,16 @@
           class="elevation-1"
           :no-data-text="!search ? 'No hay facturas registradas' : 'No se encontraron facturas'"
         >
-          <template v-slot:item.facturaHash="{ item }">
-            <v-chip size="small" variant="outlined" color="grey">
-              {{ item.facturaHash?.substring(0, 8) }}...
-            </v-chip>
+          <template v-slot:item._id="{ item }">
+            <a
+              href="#"
+              class="text-mono text-caption text-primary"
+              style="text-decoration: none; cursor: pointer;"
+              @click.prevent="viewInvoice(item._id)"
+              :title="`Ver detalle de ${item._id}`"
+            >
+              {{ item._id }}
+            </a>
           </template>
 
           <template v-slot:item.cliente.ruc="{ item }">
@@ -381,7 +387,8 @@ export default {
       { title: 'RUC', value: 'ruc' },
       { title: 'Nombre', value: 'nombre' },
       { title: 'CDC', value: 'cdc' },
-      { title: 'Tipo', value: 'tipo' }
+      { title: 'Tipo', value: 'tipo' },
+      { title: 'ID', value: 'id' }
     ];
 
     const empresaActiva = ref(null);
@@ -470,44 +477,10 @@ export default {
     });
 
     // Propiedad computada para filtrar las facturas
-    const filteredInvoices = computed(() => {
-      let result = invoices.value;
-
-      // Filtrar por empresa
-      if (empresaActiva.value) {
-        result = result.filter(invoice => invoice.rucEmpresa === empresaActiva.value);
-      }
-
-      // Filtrar por búsqueda de texto
-      if (!search.value) {
-        return result;
-      }
-
-      const searchLower = search.value.toLowerCase();
-
-      return result.filter(invoice => {
-        const ruc = (invoice.cliente?.ruc || '').toLowerCase();
-        const nombre = (invoice.cliente?.nombre || '').toLowerCase();
-        const cdc = (invoice.cdc || '').toLowerCase();
-        const tipo = (invoice.de || '').toLowerCase();
-
-        // Filtrar según el tipo de búsqueda seleccionado
-        switch (searchType.value) {
-          case 'ruc':
-            return ruc.includes(searchLower);
-          case 'nombre':
-            return nombre.includes(searchLower);
-          case 'cdc':
-            return cdc.includes(searchLower);
-          case 'tipo':
-            return tipo.includes(searchLower);
-          default:
-            return ruc.includes(searchLower);
-        }
-      });
-    });
+    const filteredInvoices = computed(() => invoices.value);
 
      const headers = [
+       { title: 'ID', key: '_id', sortable: false },
        { title: 'RUC', key: 'cliente.ruc' },
        { title: 'Cliente', key: 'cliente.nombre' },
        { title: 'CDC', key: 'cdc' },
@@ -893,6 +866,8 @@ export default {
         const params = new URLSearchParams();
         params.append('page', currentPage.value);
         params.append('limit', '10');
+        if (search.value) params.append('search', search.value);
+        if (searchType.value) params.append('searchType', searchType.value);
         if (empresaActiva.value) {
           params.append('rucEmpresa', empresaActiva.value);
         }
