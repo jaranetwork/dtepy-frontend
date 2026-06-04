@@ -110,7 +110,7 @@
     </v-main>
 
     <v-footer app>
-      <span>&copy; {{ new Date().getFullYear() }} DTE-PY</span>
+      <span>&copy; {{ new Date().getFullYear() }} DTE-PY - <a class="text-primary" style="text-decoration: none; cursor: pointer;" href="https://jaranetwork.com" target="_blank">Jara Network</a></span>
     </v-footer>
 
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">

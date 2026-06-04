@@ -48,8 +48,8 @@ Interfaz de usuario moderna y responsiva para gestionar facturas electrónicas, 
 
 ```bash
 # Clonar repositorio
-git clone https://github.com/jaranetwork/fepy-frontend.git
-cd fepy-frontend
+git clone https://github.com/jaranetwork/dtepy-frontend.git
+cd dtepy-frontend
 
 # Instalar dependencias
 npm install
@@ -69,7 +69,7 @@ npm run preview
 ## 📁 Estructura del Proyecto
 
 ```
-fepy-frontend/
+dtepy-frontend/
 ├── src/
 │   ├── components/
 │   │   ├── DashboardView.vue       # Panel principal
@@ -228,7 +228,7 @@ npm run preview
 server {
     listen 80;
     server_name tu-dominio.com;
-    root /var/www/fepy-frontend/dist;
+    root /var/www/dtepy-frontend/dist;
     index index.html;
 
     location / {
@@ -284,7 +284,7 @@ npm run test
 
 ## Proyectos
 
-- [DTE-PY backend](https://github.com/jaranetwork/fepy-backend) sistema de generación y envío de factura electrónica al sistema SIFEN Paraguay
+- [DTE-PY backend](https://github.com/jaranetwork/dtepy-backend) sistema de generación y envío de factura electrónica al sistema SIFEN Paraguay
 - [Módulo ERPNext](https://github.com/jaranetwork/einvoice) para el envío de facturas a DTE-PY
 
 ## 📚 Recursos
