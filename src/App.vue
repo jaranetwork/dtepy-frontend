@@ -55,7 +55,7 @@
       <v-list>
         <v-list-item link to="/">
           <v-list-item-title class="text-h6 font-weight-bold">
-            FEPY Dashboard
+            DTE-PY Dashboard
           </v-list-item-title>
         </v-list-item>
 
@@ -110,7 +110,7 @@
     </v-main>
 
     <v-footer app>
-      <span>&copy; {{ new Date().getFullYear() }} FEPY</span>
+      <span>&copy; {{ new Date().getFullYear() }} DTE-PY</span>
     </v-footer>
 
     <v-snackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
