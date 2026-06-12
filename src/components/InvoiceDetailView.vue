@@ -37,7 +37,23 @@
               <v-icon left>mdi-refresh</v-icon>
               Consultar Estado
             </v-btn>
+            <v-tooltip v-if="invoice.grupoLoteId" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  color="warning"
+                  variant="outlined"
+                  class="ml-2"
+                  v-bind="props"
+                  @click="dialogoEliminar = true"
+                >
+                  <v-icon left>mdi-delete</v-icon>
+                  Eliminar
+                </v-btn>
+              </template>
+              <span>Pertenece a un lote de envío</span>
+            </v-tooltip>
             <v-btn
+              v-else
               color="error"
               variant="outlined"
               class="ml-2"
@@ -66,6 +82,28 @@
                     <p v-if="invoice.fechaEnvio"><strong>Fecha de Envío:</strong> {{ formatDate(invoice.fechaEnvio) }}</p>
                     <p v-if="invoice.fechaProceso"><strong>Fecha de Proceso:</strong> {{ formatDateTime(invoice.fechaProceso) }}</p>
                     <p><strong>Estado en SIFEN:</strong> {{ invoice.estado || 'No disponible' }}</p>
+                    <p>
+                      <strong>Tipo de Emisión:</strong>
+                      <v-chip
+                        :color="invoice.tipoEmision === 2 ? 'red' : 'green'"
+                        size="x-small"
+                        variant="flat"
+                        class="ml-1"
+                      >
+                        {{ invoice.tipoEmision === 2 ? 'Contingencia' : 'Normal' }}
+                      </v-chip>
+                    </p>
+                    <p v-if="invoice.grupoLoteId">
+                      <strong>Grupo Lote:</strong>
+                      <a
+                        href="#"
+                        class="text-primary text-caption ml-1"
+                        style="text-decoration: none;"
+                        @click.prevent="verLote(invoice.grupoLoteId)"
+                      >
+                        {{ invoice.grupoLoteId }}
+                      </a>
+                    </p>
                     <p>
                       <strong>Proceso:</strong>
                       <v-chip
@@ -298,16 +336,26 @@
             <!-- Diálogo de Confirmación para Eliminar Factura -->
             <v-dialog v-model="dialogoEliminar" max-width="500" persistent>
               <v-card>
-                <v-card-title class="text-h5 error--text">
-                  <v-icon left color="error">mdi-alert-circle</v-icon>
-                  Confirmar Eliminación
+                <v-card-title class="text-h5 d-flex align-center" :class="invoice.grupoLoteId ? 'bg-warning text-black' : 'error--text'">
+                  <v-icon left :color="invoice.grupoLoteId ? '' : 'error'">mdi-alert-circle</v-icon>
+                  {{ invoice.grupoLoteId ? 'Factura en Lote' : 'Confirmar Eliminación' }}
                 </v-card-title>
                 <v-card-text>
-                  <v-alert type="error" variant="tonal" class="mb-4">
+                  <v-alert
+                    v-if="invoice.grupoLoteId"
+                    type="warning"
+                    variant="tonal"
+                    class="mb-4"
+                  >
+                    <strong>No se puede eliminar</strong> — esta factura pertenece a un
+                    <router-link :to="`/lotes/${invoice.grupoLoteId}`" class="text-decoration-underline">lote de envío</router-link>.
+                    Debe eliminar la factura del lote antes de poder eliminarla.
+                  </v-alert>
+                  <v-alert v-else type="error" variant="tonal" class="mb-4">
                     <strong>⚠️ Atención:</strong> Esta acción NO se puede deshacer.
                   </v-alert>
-                  <p>¿Está seguro de que desea eliminar la siguiente factura?</p>
-                  <v-card outlined class="pa-4 mt-3">
+                  <p v-if="!invoice.grupoLoteId">¿Está seguro de que desea eliminar la siguiente factura?</p>
+                  <v-card variant="outlined" class="pa-4 mt-3">
                     <p><strong>Correlativo:</strong> {{ invoice.correlativo }}</p>
                     <p><strong>Cliente:</strong> {{ invoice.cliente?.nombre }}</p>
                     <p><strong>Estado:</strong> {{ invoice.estado }}</p>
@@ -321,9 +369,10 @@
                     @click="dialogoEliminar = false"
                     :disabled="eliminando"
                   >
-                    Cancelar
+                    {{ invoice.grupoLoteId ? 'Cerrar' : 'Cancelar' }}
                   </v-btn>
                   <v-btn
+                    v-if="!invoice.grupoLoteId"
                     color="error"
                     variant="flat"
                     @click="deleteInvoice"
@@ -606,6 +655,10 @@ export default {
       return new Intl.NumberFormat('es-PY').format(amount);
     };
     
+    const verLote = (id) => {
+      window.location.href = `/lotes/${id}`;
+    };
+
     const formatDate = (dateString) => {
       const date = new Date(dateString);
       return date.toLocaleDateString('es-PY');
@@ -898,6 +951,7 @@ export default {
       formatCurrency,
       formatDate,
       formatDateTime,
+      verLote,
       retryInvoice,
       confirmDeleteInvoice,
       downloadXml,

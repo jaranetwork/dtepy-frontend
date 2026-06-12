@@ -20,8 +20,9 @@
 
         <v-data-table
           :headers="headers"
-          :items="apiKeys"
+          :items="apiKeysDisplayadas"
           :loading="loading"
+          hide-default-footer
           class="elevation-1"
         >
           <template v-slot:item.nombre="{ item }">
@@ -57,26 +58,60 @@
           </template>
 
           <template v-slot:item.actions="{ item }">
-            <v-btn
-              color="primary"
-              size="small"
-              variant="text"
-              @click="renovarApiKey(item)"
-              :disabled="!item.activa"
-            >
-              <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-            <v-btn
-              color="error"
-              size="small"
-              variant="text"
-              @click="confirmarRevocar(item)"
-              :disabled="!item.activa"
-            >
-              <v-icon>mdi-cancel</v-icon>
-            </v-btn>
+            <v-menu v-model="item.menuOpen" :close-on-content-click="false" location="start">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  color="primary"
+                  size="small"
+                  variant="tonal"
+                  v-bind="props"
+                  title="Acciones"
+                >
+                  <v-icon>mdi-dots-vertical</v-icon>
+                </v-btn>
+              </template>
+              <v-list density="compact" min-width="200">
+                <v-list-item
+                  @click="renovarApiKey(item); item.menuOpen = false"
+                  :disabled="!item.activa"
+                >
+                  <template v-slot:prepend>
+                    <v-icon color="primary" size="small">mdi-refresh</v-icon>
+                  </template>
+                  <v-list-item-title>Renovar</v-list-item-title>
+                </v-list-item>
+                <v-divider></v-divider>
+                <v-list-item
+                  @click="confirmarRevocar(item); item.menuOpen = false"
+                  :disabled="!item.activa"
+                >
+                  <template v-slot:prepend>
+                    <v-icon color="error" size="small">mdi-cancel</v-icon>
+                  </template>
+                  <v-list-item-title class="text-error">Revocar</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
           </template>
         </v-data-table>
+
+        <div class="d-flex align-center justify-center pt-4" style="gap: 16px;">
+          <div class="d-flex align-center" style="gap: 8px;">
+            <span class="text-body-2">Items por página:</span>
+            <v-select
+              v-model="itemsPerPage"
+              :items="[10, 15, 25, 50, 100]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width: 80px;"
+            ></v-select>
+          </div>
+          <v-pagination
+            v-model="currentPage"
+            :length="totalPages"
+          ></v-pagination>
+        </div>
       </v-card-text>
     </v-card>
 
@@ -209,7 +244,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 
 export default {
@@ -217,6 +252,8 @@ export default {
   setup() {
     const apiKeys = ref([]);
     const loading = ref(false);
+    const currentPage = ref(1);
+    const itemsPerPage = ref(10);
     const loadingCrear = ref(false);
     const showNewKeyDialog = ref(false);
     const showKeyResult = ref(false);
@@ -238,6 +275,23 @@ export default {
       { title: 'Último Uso', key: 'ultimoUso' },
       { title: 'Acciones', key: 'actions', sortable: false }
     ];
+
+    // Paginación client-side
+    const totalPages = computed(() => Math.max(1, Math.ceil(apiKeys.value.length / itemsPerPage.value)));
+
+    const apiKeysDisplayadas = computed(() => {
+      const start = (currentPage.value - 1) * itemsPerPage.value;
+      const end = start + itemsPerPage.value;
+      return apiKeys.value.slice(start, end);
+    });
+
+    watch(itemsPerPage, () => {
+      currentPage.value = 1;
+    });
+
+    watch(apiKeys, () => {
+      currentPage.value = 1;
+    });
 
     const nuevaKey = ref({
       nombre: '',
@@ -377,6 +431,10 @@ export default {
       nuevaKey,
       permisosDisponibles,
       headers,
+      currentPage,
+      itemsPerPage,
+      totalPages,
+      apiKeysDisplayadas,
       listarApiKeys,
       crearApiKey,
       renovarApiKey,

@@ -25,8 +25,9 @@
           <v-card-text>
             <v-data-table
               :headers="headers"
-              :items="empresas"
+              :items="empresasDisplayadas"
               :loading="cargando"
+              hide-default-footer
               item-key="_id"
               class="elevation-0"
             >
@@ -79,30 +80,40 @@
 
               <!-- Acciones -->
               <template #item.acciones="{ item }">
-                <v-btn
-                  icon="mdi-pencil"
-                  size="small"
-                  variant="text"
-                  @click="editarEmpresa(item)"
-                  title="Editar"
-                ></v-btn>
-
-                <v-btn
-                  icon="mdi-certificate"
-                  size="small"
-                  variant="text"
-                  @click="abrirDialogoCertificado(item)"
-                  title="Certificado"
-                ></v-btn>
-
-                <v-btn
-                  icon="mdi-delete"
-                  size="small"
-                  variant="text"
-                  color="error"
-                  @click="confirmarEliminar(item)"
-                  title="Eliminar"
-                ></v-btn>
+                <v-menu v-model="item.menuOpen" :close-on-content-click="false" location="start">
+                  <template v-slot:activator="{ props }">
+                    <v-btn
+                      color="primary"
+                      size="small"
+                      variant="tonal"
+                      v-bind="props"
+                      title="Acciones"
+                    >
+                      <v-icon>mdi-dots-vertical</v-icon>
+                    </v-btn>
+                  </template>
+                  <v-list density="compact" min-width="200">
+                    <v-list-item @click="editarEmpresa(item); item.menuOpen = false">
+                      <template v-slot:prepend>
+                        <v-icon color="primary" size="small">mdi-pencil</v-icon>
+                      </template>
+                      <v-list-item-title>Editar</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="abrirDialogoCertificado(item); item.menuOpen = false">
+                      <template v-slot:prepend>
+                        <v-icon color="warning" size="small">mdi-certificate</v-icon>
+                      </template>
+                      <v-list-item-title>Certificado</v-list-item-title>
+                    </v-list-item>
+                    <v-divider></v-divider>
+                    <v-list-item @click="confirmarEliminar(item); item.menuOpen = false">
+                      <template v-slot:prepend>
+                        <v-icon color="error" size="small">mdi-delete</v-icon>
+                      </template>
+                      <v-list-item-title class="text-error">Eliminar</v-list-item-title>
+                    </v-list-item>
+                  </v-list>
+                </v-menu>
               </template>
 
               <!-- Mensaje cuando no hay datos -->
@@ -117,6 +128,24 @@
                 </div>
               </template>
             </v-data-table>
+
+            <div class="d-flex align-center justify-center pt-4" style="gap: 16px;">
+              <div class="d-flex align-center" style="gap: 8px;">
+                <span class="text-body-2">Items por página:</span>
+                <v-select
+                  v-model="itemsPerPage"
+                  :items="[10, 15, 25, 50, 100]"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  style="max-width: 80px;"
+                ></v-select>
+              </div>
+              <v-pagination
+                v-model="currentPage"
+                :length="totalPages"
+              ></v-pagination>
+            </div>
           </v-card-text>
         </v-card>
       </v-col>
@@ -260,6 +289,20 @@
                     </div>
                   </v-col>
 
+                  <v-col cols="12" md="6">
+                    <v-select
+                      v-model="formulario.configuracionSifen.envioFacturas"
+                      label="Envío de Facturas"
+                      :items="[
+                        { title: 'Normal (individual)', value: 'normal' },
+                        { title: 'Por Lotes (agrupado por tipo)', value: 'lotes' }
+                      ]"
+                      hint="Define cómo se envían las facturas a SIFEN"
+                      persistent-hint
+                      outlined
+                    ></v-select>
+                  </v-col>
+
                   <v-col cols="12">
                     <v-text-field
                       v-model="formulario.configuracionSifen.csc"
@@ -360,7 +403,7 @@
     </v-dialog>
 
     <!-- Diálogo: Confirmar eliminación -->
-    <v-dialog v-model="mostrarDialogoEliminar" max-width="450" persistent>
+    <v-dialog v-model="mostrarDialogoEliminar" max-width="500" persistent>
       <v-card>
         <v-card-title class="text-h5 d-flex align-center bg-error text-white">
           <v-icon start>mdi-delete-forever</v-icon>
@@ -370,17 +413,37 @@
             icon="mdi-close"
             size="small"
             variant="text"
-            @click="mostrarDialogoEliminar = false"
+            @click="mostrarDialogoEliminar = false; dependencias = null"
             :disabled="eliminando"
             color="white"
           ></v-btn>
         </v-card-title>
         <v-card-text class="mt-4">
-          <v-alert type="warning" variant="tonal" icon="mdi-alert" class="mb-3">
+          <v-alert
+            v-if="tieneDependencias"
+            type="error"
+            variant="tonal"
+            icon="mdi-block-helper"
+            class="mb-3"
+          >
+            <strong>No se puede eliminar</strong> — la empresa tiene registros dependientes:
+            <ul class="mt-1 mb-0">
+              <li v-if="dependencias.facturas > 0">{{ dependencias.facturas }} factura(s) asociada(s)</li>
+              <li v-if="dependencias.lotes > 0">{{ dependencias.lotes }} lote(s) de envío</li>
+              <li v-if="dependencias.eventos > 0">{{ dependencias.eventos }} evento(s)</li>
+              <li v-if="dependencias.apiKeys > 0">{{ dependencias.apiKeys }} clave(s) de API</li>
+            </ul>
+          </v-alert>
+          <v-alert v-else type="warning" variant="tonal" icon="mdi-alert" class="mb-3">
             <strong>⚠️ Advertencia:</strong> Esta acción eliminará permanentemente la empresa.
           </v-alert>
           <p class="text-body-1 mb-2">
-            ¿Estás <strong>SEGURO</strong> de que deseas eliminar la empresa?
+            <template v-if="tieneDependencias">
+              Elimine o reasigne los registros dependientes antes de eliminar la empresa.
+            </template>
+            <template v-else>
+              ¿Estás <strong>SEGURO</strong> de que deseas eliminar la empresa?
+            </template>
           </p>
           <v-card variant="outlined" class="pa-3 mb-3">
             <div class="text-subtitle-1 font-weight-bold">{{ empresaSeleccionada?.nombreFantasia }}</div>
@@ -389,26 +452,29 @@
               <v-icon start size="x-small">mdi-account</v-icon> {{ empresaSeleccionada?.razonSocial }}
             </div>
           </v-card>
-          <p class="text-body-2 text-medium-emphasis">
-            Esta acción <strong>no se puede deshacer</strong>. Se eliminarán:
-          </p>
-          <ul class="text-body-2 text-medium-emphasis">
-            <li>La empresa y su configuración</li>
-            <li>El certificado digital asociado</li>
-            <li>Las referencias a configuraciones SIFEN</li>
-          </ul>
+          <template v-if="!tieneDependencias">
+            <p class="text-body-2 text-medium-emphasis">
+              Esta acción <strong>no se puede deshacer</strong>. Se eliminarán:
+            </p>
+            <ul class="text-body-2 text-medium-emphasis">
+              <li>La empresa y su configuración</li>
+              <li>El certificado digital asociado</li>
+              <li>Las referencias a configuraciones SIFEN</li>
+            </ul>
+          </template>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn
             color="grey"
             variant="text"
-            @click="mostrarDialogoEliminar = false"
+            @click="mostrarDialogoEliminar = false; dependencias = null"
             :disabled="eliminando"
           >
-            Cancelar
+            {{ tieneDependencias ? 'Cerrar' : 'Cancelar' }}
           </v-btn>
           <v-btn
+            v-if="!tieneDependencias"
             color="error"
             variant="tonal"
             @click="eliminarEmpresa"
@@ -437,7 +503,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 
 export default {
@@ -446,6 +512,8 @@ export default {
     // Estado
     const empresas = ref([]);
     const cargando = ref(false);
+    const currentPage = ref(1);
+    const itemsPerPage = ref(10);
     const guardando = ref(false);
     const subiendoCertificado = ref(false);
     const eliminando = ref(false);
@@ -471,7 +539,8 @@ export default {
         idCSC: '0001',
         csc: '',
         modo: 'test',
-        urlLogo: ''
+        urlLogo: '',
+        envioFacturas: 'normal'
       }
     });
     
@@ -500,6 +569,23 @@ export default {
       { title: 'Acciones', key: 'acciones', sortable: false, align: 'end' }
     ];
     
+    // Paginación client-side
+    const totalPages = computed(() => Math.max(1, Math.ceil(empresas.value.length / itemsPerPage.value)));
+
+    const empresasDisplayadas = computed(() => {
+      const start = (currentPage.value - 1) * itemsPerPage.value;
+      const end = start + itemsPerPage.value;
+      return empresas.value.slice(start, end);
+    });
+
+    watch(itemsPerPage, () => {
+      currentPage.value = 1;
+    });
+
+    watch(empresas, () => {
+      currentPage.value = 1;
+    });
+
     // Cargar empresas
     const cargarEmpresas = async () => {
       cargando.value = true;
@@ -540,7 +626,8 @@ export default {
           idCSC: '0001',
           csc: '',
           modo: 'test',
-          urlLogo: ''
+          urlLogo: '',
+          envioFacturas: 'normal'
         }
       };
       mostrarDialogoFormulario.value = true;
@@ -561,7 +648,8 @@ export default {
           idCSC: empresa.configuracionSifen?.idCSC || '0001',
           csc: empresa.configuracionSifen?.csc || '',
           modo: empresa.configuracionSifen?.modo || 'test',
-          urlLogo: empresa.configuracionSifen?.urlLogo || ''
+          urlLogo: empresa.configuracionSifen?.urlLogo || '',
+          envioFacturas: empresa.configuracionSifen?.envioFacturas || 'normal'
         }
       };
       mostrarDialogoFormulario.value = true;
@@ -651,9 +739,17 @@ export default {
       }
     };
     
+    const dependencias = ref(null);
+    const tieneDependencias = computed(() => {
+      if (!dependencias.value) return false;
+      const d = dependencias.value;
+      return d.facturas > 0 || d.lotes > 0 || d.eventos > 0 || d.apiKeys > 0;
+    });
+
     // Confirmar eliminación
     const confirmarEliminar = (empresa) => {
       empresaSeleccionada.value = empresa;
+      dependencias.value = null;
       mostrarDialogoEliminar.value = true;
     };
     
@@ -668,10 +764,15 @@ export default {
         mostrarDialogoEliminar.value = false;
         cargarEmpresas();
       } catch (error) {
-        mostrarSnackbar(
-          error.response?.data?.error || error.response?.data?.mensaje || 'Error eliminando empresa',
-          'error'
-        );
+        const dep = error.response?.data?.dependencias;
+        if (dep) {
+          dependencias.value = dep;
+        } else {
+          mostrarSnackbar(
+            error.response?.data?.error || error.response?.data?.mensaje || 'Error eliminando empresa',
+            'error'
+          );
+        }
       } finally {
         eliminando.value = false;
       }
@@ -708,6 +809,10 @@ export default {
       // Empresa seleccionada
       empresaSeleccionada,
       
+      // Dependencias
+      dependencias,
+      tieneDependencias,
+      
       // Snackbar
       snackbar,
       snackbarText,
@@ -715,7 +820,13 @@ export default {
       
       // Headers
       headers,
-      
+
+      // Paginación
+      currentPage,
+      itemsPerPage,
+      totalPages,
+      empresasDisplayadas,
+
       // Métodos
       cargarEmpresas,
       mostrarSnackbar,

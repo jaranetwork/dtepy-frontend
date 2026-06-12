@@ -19,6 +19,9 @@ import LoginView from './components/LoginView.vue'
 import ApiKeysView from './components/ApiKeysView.vue'
 import EmpresasView from './components/EmpresasView.vue'
 import QueueStatusView from './components/QueueStatusView.vue'
+import LotesView from './components/LotesView.vue'
+import LoteDetailView from './components/LoteDetailView.vue'
+import MantenimientoView from './components/MantenimientoView.vue'
 
 // Importar autenticación
 import { cargarSesion, cerrarSesion } from './auth'
@@ -63,7 +66,10 @@ const routes = [
   { path: '/empresas', component: EmpresasView, meta: { requiereAuth: true } },
   { path: '/logs', component: LogsView, meta: { requiereAuth: true } },
   { path: '/api-keys', component: ApiKeysView, meta: { requiereAuth: true } },
-  { path: '/queue-status', component: QueueStatusView, meta: { requiereAuth: true } }
+  { path: '/queue-status', component: QueueStatusView, meta: { requiereAuth: true } },
+  { path: '/lotes', component: LotesView, meta: { requiereAuth: true } },
+  { path: '/lotes/:id', component: LoteDetailView, meta: { requiereAuth: true } },
+  { path: '/mantenimiento', component: MantenimientoView, meta: { requiereAuth: true } }
 ]
 
 // Crear router

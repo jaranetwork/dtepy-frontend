@@ -15,61 +15,6 @@
       </template>
     </v-snackbar>
 
-    <!-- Diálogo de Confirmación para Limpiar BD -->
-    <v-dialog v-model="clearDialog" max-width="450" persistent>
-      <v-card>
-        <v-card-title class="text-h5 d-flex align-center bg-error text-white">
-          <v-icon start>mdi-database-remove</v-icon>
-          Eliminar TODAS las Facturas
-          <v-spacer></v-spacer>
-          <v-btn
-            icon="mdi-close"
-            size="small"
-            variant="text"
-            @click="clearDialog = false"
-            :disabled="clearing"
-            color="white"
-          ></v-btn>
-        </v-card-title>
-        <v-card-text class="mt-4">
-          <v-alert type="warning" variant="tonal" icon="mdi-alert" class="mb-3">
-            <strong>⚠️ Advertencia:</strong> Esta acción eliminará permanentemente todas las facturas de la base de datos.
-          </v-alert>
-          <p class="text-body-1">
-            ¿Estás <strong>SEGURO</strong> de que deseas continuar?
-          </p>
-          <p class="text-body-2 text-medium-emphasis">
-            Esta acción <strong>no se puede deshacer</strong>. Se eliminarán:
-          </p>
-          <ul class="text-body-2 text-medium-emphasis">
-            <li>Todas las facturas registradas</li>
-            <li>Los logs de operaciones asociados</li>
-            <li>Las referencias a archivos XML y PDF</li>
-          </ul>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn
-            color="grey"
-            variant="text"
-            @click="clearDialog = false"
-            :disabled="clearing"
-          >
-            Cancelar
-          </v-btn>
-          <v-btn
-            color="error"
-            variant="tonal"
-            @click="executeClearDatabase"
-            :loading="clearing"
-          >
-            <v-icon start>mdi-delete-forever</v-icon>
-            Eliminar Todo
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <!-- Diálogo de Confirmación para Reintentar Factura -->
     <v-dialog v-model="retryDialog" max-width="400" persistent>
       <v-card>
@@ -123,16 +68,25 @@
     <!-- Diálogo de Confirmación para Eliminar Factura -->
     <v-dialog v-model="deleteDialog" max-width="500" persistent>
       <v-card>
-        <v-card-title class="text-h5 error--text">
-          <v-icon left color="error">mdi-alert-circle</v-icon>
-          Confirmar Eliminación
+        <v-card-title class="text-h5 d-flex align-center" :class="deleteInvoiceEnLote ? 'bg-warning text-black' : 'error--text'">
+          <v-icon left :color="deleteInvoiceEnLote ? '' : 'error'">mdi-alert-circle</v-icon>
+          {{ deleteInvoiceEnLote ? 'Factura en Lote' : 'Confirmar Eliminación' }}
         </v-card-title>
         <v-card-text>
-          <v-alert type="error" variant="tonal" class="mb-4">
+          <v-alert
+            v-if="deleteInvoiceEnLote"
+            type="warning"
+            variant="tonal"
+            class="mb-4"
+          >
+            <strong>No se puede eliminar</strong> — esta factura pertenece a un lote de envío.
+            Debe eliminar la factura del lote antes de poder eliminarla.
+          </v-alert>
+          <v-alert v-else type="error" variant="tonal" class="mb-4">
             <strong>⚠️ Atención:</strong> Esta acción NO se puede deshacer.
           </v-alert>
-          <p>¿Está seguro de que desea eliminar la siguiente factura?</p>
-          <v-card outlined class="pa-4 mt-3">
+          <p v-if="!deleteInvoiceEnLote">¿Está seguro de que desea eliminar la siguiente factura?</p>
+          <v-card variant="outlined" class="pa-4 mt-3">
             <p><strong>Correlativo:</strong> {{ deleteInvoiceData?.correlativo }}</p>
             <p><strong>Cliente:</strong> {{ deleteInvoiceData?.cliente?.nombre }}</p>
             <p><strong>Estado:</strong> {{ deleteInvoiceData?.estado }}</p>
@@ -146,9 +100,10 @@
             @click="deleteDialog = false"
             :disabled="deleting"
           >
-            Cancelar
+            {{ deleteInvoiceEnLote ? 'Cerrar' : 'Cancelar' }}
           </v-btn>
           <v-btn
+            v-if="!deleteInvoiceEnLote"
             color="error"
             variant="flat"
             @click="executeDeleteInvoice"
@@ -190,14 +145,6 @@
             style="max-width: 130px;"
           ></v-select>
           
-          <v-btn
-            color="error"
-            variant="outlined"
-            @click="confirmClearDatabase"
-          >
-            <v-icon left>mdi-delete-empty</v-icon>
-            Limpiar BD
-          </v-btn>
         </div>
       </v-card-title>
 
@@ -219,10 +166,11 @@
         </v-alert>
 
         <v-data-table
+          hide-default-footer
           :headers="headers"
           :items="filteredInvoices"
           :loading="loading"
-          :items-per-page="10"
+          :items-per-page="itemsPerPage"
           class="elevation-1"
           :no-data-text="!search ? 'No hay facturas registradas' : 'No se encontraron facturas'"
         >
@@ -252,12 +200,33 @@
             </v-chip>
           </template>
 
+          <template v-slot:item.tipoEmision="{ item }">
+            <v-chip
+              :color="item.tipoEmision === 2 ? 'red' : 'green'"
+              size="x-small"
+              variant="flat"
+            >
+              {{ item.tipoEmision === 2 ? 'Contingencia' : 'Normal' }}
+            </v-chip>
+          </template>
+
+          <template v-slot:item.grupoLoteId="{ item }">
+            <router-link
+              v-if="item.grupoLoteId"
+              :to="`/lotes/${item.grupoLoteId}`"
+              class="text-primary text-caption text-decoration-none"
+            >
+              {{ item.grupoLoteId }}
+            </router-link>
+            <span v-else class="text-grey">-</span>
+          </template>
+
           <template v-slot:item.estado="{ item }">
             <v-chip
               :color="getEstadoVisualColor(item.estadoVisual, item.codigoRetorno, item.estado)"
               variant="flat"
             >
-              {{ getEstadoVisualTexto(item.estadoVisual, item.codigoRetorno, item.estado) }}
+              {{ item.estado }}
             </v-chip>
           </template>
 
@@ -340,7 +309,18 @@
           </template>
         </v-data-table>
         
-        <div class="text-center pt-4">
+        <div class="d-flex align-center justify-center pt-4" style="gap: 16px;">
+          <div class="d-flex align-center" style="gap: 8px;">
+            <span class="text-body-2">Items por página:</span>
+            <v-select
+              v-model="itemsPerPage"
+              :items="[10, 25, 50, 100]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width: 80px;"
+            ></v-select>
+          </div>
           <v-pagination
             v-model="currentPage"
             :length="totalPages"
@@ -366,20 +346,21 @@ export default {
     const searchType = ref('ruc');
     const currentPage = ref(1);
     const totalPages = ref(1);
+    const itemsPerPage = ref(10);
     const totalItems = ref(0);
     const statusSnackbar = ref(false);
     const statusSnackbarText = ref('');
     const statusSnackbarColor = ref('info');
     const statusSnackbarIcon = ref('mdi-information');
-    const clearDialog = ref(false);
     const retryDialog = ref(false);
     const retrying = ref(false);
     const retryInvoiceData = ref(null);
     const deleteDialog = ref(false);
     const deleting = ref(false);
     const deleteInvoiceData = ref(null);
-    const clearing = ref(false);
-
+    const deleteInvoiceEnLote = computed(() => {
+      return deleteInvoiceData.value?.grupoLoteId != null;
+    });
     const route = useRoute();
     const router = useRouter();
 
@@ -480,15 +461,17 @@ export default {
     const filteredInvoices = computed(() => invoices.value);
 
      const headers = [
-       { title: 'ID', key: '_id', sortable: false },
-       { title: 'RUC', key: 'cliente.ruc' },
-       { title: 'Cliente', key: 'cliente.nombre' },
-       { title: 'CDC', key: 'cdc' },
-       { title: 'Fecha', key: 'createdAt' },
-       { title: 'Tipo DE', key: 'de' },
-       { title: 'Estado SIFEN', key: 'estado' },
-       { title: 'Acciones', key: 'actions', sortable: false }
-     ];
+        { title: 'Fecha', key: 'createdAt' },
+        { title: 'ID', key: '_id', sortable: false },
+        { title: 'Tipo DE', key: 'de' },
+        { title: 'Estado SIFEN', key: 'estado' },
+        // { title: 'RUC', key: 'cliente.ruc' },
+        // { title: 'Cliente', key: 'cliente.nombre' },
+        // { title: 'CDC', key: 'cdc' },
+        { title: 'Emisión', key: 'tipoEmision' },
+        { title: 'Lote', key: 'grupoLoteId' },
+        { title: 'Acciones', key: 'actions', sortable: false }
+      ];
 
     const getStatusColor = (status) => {
       switch(status) {
@@ -508,25 +491,19 @@ export default {
     // Función para determinar el estado visual según código de retorno SIFEN v150
     // Retorna: 'aceptado', 'observado', 'rechazado' o 'error'
     const getEstadoVisual = (estadoVisual, codigoRetorno, estado) => {
-      // Si ya tenemos estadoVisual, usarlo directamente
       if (estadoVisual) {
         return estadoVisual;
       }
 
-      // Si no hay estadoVisual, determinar por el estado SIFEN
-      // Estados que se muestran como aceptado (verde)
       if (estado === 'aceptado' || estado === 'enviado') {
         return 'aceptado';
       }
-      // Estados que se muestran como observado (ámbar)
-      if (estado === 'observado' || estado === 'procesando') {
+      if (estado === 'observado' || estado === 'procesando' || estado === 'encolado') {
         return 'observado';
       }
-      // Error de conexión (rojo)
       if (estado === 'error') {
         return 'error';
       }
-      // Todos los demás como rechazado (rojo)
       return 'rechazado';
     };
 
@@ -545,12 +522,6 @@ export default {
         default:
           return 'info';
       }
-    };
-
-    // Función para obtener el texto del estado visual
-    const getEstadoVisualTexto = (estadoVisual, codigoRetorno, estado) => {
-      const visual = getEstadoVisual(estadoVisual, codigoRetorno, estado);
-      return visual;
     };
 
     // Funciones para el campo proceso
@@ -585,6 +556,10 @@ export default {
     
     const viewInvoice = (id) => {
       window.location.href = `/invoices/${id}`;
+    };
+
+    const verLote = (id) => {
+      window.location.href = `/lotes/${id}`;
     };
 
     const downloadXml = async (invoice) => {
@@ -767,33 +742,6 @@ export default {
       }
     };
 
-    const confirmClearDatabase = () => {
-      clearDialog.value = true;
-    };
-
-    const executeClearDatabase = async () => {
-      clearing.value = true;
-      try {
-        const response = await axios.delete('/api/invoices/clear');
-
-        statusSnackbarText.value = `✅ ${response.data.message}`;
-        statusSnackbarColor.value = 'success';
-        statusSnackbarIcon.value = 'mdi-check-circle';
-        statusSnackbar.value = true;
-
-        clearDialog.value = false;
-        loadInvoices();
-      } catch (error) {
-        console.error('Error limpiando base de datos:', error);
-        statusSnackbarText.value = `❌ Error al limpiar la base de datos: ${error.response?.data?.message || error.message}`;
-        statusSnackbarColor.value = 'error';
-        statusSnackbarIcon.value = 'mdi-alert-circle';
-        statusSnackbar.value = true;
-      } finally {
-        clearing.value = false;
-      }
-    };
-
     const confirmRetryInvoice = (invoice) => {
       retryInvoiceData.value = invoice;
       retryDialog.value = true;
@@ -860,12 +808,17 @@ export default {
       currentPage.value = page;
     };
 
+    watch(itemsPerPage, () => {
+      currentPage.value = 1;
+      loadInvoices();
+    });
+
     const loadInvoices = async () => {
       loading.value = true;
       try {
         const params = new URLSearchParams();
         params.append('page', currentPage.value);
-        params.append('limit', '10');
+        params.append('limit', itemsPerPage.value);
         if (search.value) params.append('search', search.value);
         if (searchType.value) params.append('searchType', searchType.value);
         if (empresaActiva.value) {
@@ -897,16 +850,17 @@ export default {
       currentPage,
       totalPages,
       totalItems,
+      itemsPerPage,
       headers,
       getStatusColor,
       getEstadoVisual,
       getEstadoVisualColor,
-      getEstadoVisualTexto,
       getProcesoColor,
       getProcesoTexto,
       formatCurrency,
       formatDate,
       viewInvoice,
+      verLote,
       downloadXml,
       downloadPdf,
       refreshInvoiceStatus,
@@ -917,14 +871,11 @@ export default {
       deleteDialog,
       deleting,
       deleteInvoiceData,
+      deleteInvoiceEnLote,
       changePage,
-      confirmClearDatabase,
-      executeClearDatabase,
-      clearDialog,
       retryDialog,
       retrying,
       retryInvoiceData,
-      clearing,
       statusSnackbar,
       statusSnackbarText,
       statusSnackbarColor,

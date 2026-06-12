@@ -20,35 +20,6 @@
           style="max-width: 300px;"
           class="ml-4"
         ></v-text-field>
-        <v-menu v-model="menuOpen" :close-on-content-click="false" location="end">
-          <template v-slot:activator="{ props }">
-            <v-btn
-              v-bind="props"
-              color="error"
-              variant="outlined"
-              class="ml-2"
-              :loading="clearing"
-            >
-              <v-icon start>mdi-delete-sweep</v-icon>
-              Limpiar
-            </v-btn>
-          </template>
-          <v-list>
-            <v-list-item @click="confirmClearLogs('all')">
-              <v-list-item-title>Todos los registros</v-list-item-title>
-            </v-list-item>
-            <v-divider></v-divider>
-            <v-list-item @click="confirmClearLogs('error')">
-              <v-list-item-title>Solo errores</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="confirmClearLogs('success')">
-              <v-list-item-title>Solo éxitos</v-list-item-title>
-            </v-list-item>
-            <v-list-item @click="confirmClearLogs('warning')">
-              <v-list-item-title>Solo advertencias</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-menu>
       </v-card-title>
 
       <v-card-text>
@@ -57,7 +28,8 @@
           :items="logs"
           :search="search"
           :loading="loading"
-          :items-per-page="15"
+          :items-per-page="itemsPerPage"
+          hide-default-footer
           class="elevation-1"
         >
           <template v-slot:item.invoiceId.correlativo="{ item }">
@@ -110,7 +82,18 @@
           </template>
         </v-data-table>
         
-        <div class="text-center pt-4">
+        <div class="d-flex align-center justify-center pt-4" style="gap: 16px;">
+          <div class="d-flex align-center" style="gap: 8px;">
+            <span class="text-body-2">Items por página:</span>
+            <v-select
+              v-model="itemsPerPage"
+              :items="[10, 15, 25, 50, 100]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="max-width: 80px;"
+            ></v-select>
+          </div>
           <v-pagination
             v-model="currentPage"
             :length="totalPages"
@@ -120,106 +103,27 @@
       </v-card-text>
     </v-card>
 
-    <!-- Diálogo de confirmación para limpiar logs -->
-    <v-dialog v-model="dialog" max-width="500" persistent>
-      <v-card>
-        <v-card-title class="text-white" :class="dialogType === 'error' ? 'bg-error' : 'bg-warning'">
-          <v-icon start>mdi-alert</v-icon>
-          {{ dialogTitle }}
-        </v-card-title>
-        <v-card-text class="pt-4">
-          <v-alert
-            v-if="dialogType === 'all'"
-            type="warning"
-            variant="tonal"
-            density="compact"
-            class="mb-3"
-          >
-            Esta acción eliminará todos los registros de operaciones.
-          </v-alert>
-          <v-alert
-            v-else
-            type="info"
-            variant="tonal"
-            density="compact"
-            class="mb-3"
-          >
-            Esta acción eliminará solo los registros con estado <strong>{{ dialogType }}</strong>.
-          </v-alert>
-          <p>¿Está seguro de continuar?</p>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn
-            variant="outlined"
-            @click="dialog = false"
-            :disabled="clearing"
-          >
-            Cancelar
-          </v-btn>
-          <v-btn
-            color="error"
-            variant="flat"
-            @click="executeClearLogs"
-            :loading="clearing"
-          >
-            <v-icon start>mdi-delete</v-icon>
-            Eliminar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Snackbar para notificaciones -->
-    <v-snackbar
-      v-model="snackbar"
-      :color="snackbarColor"
-      :timeout="3000"
-      location="top right"
-    >
-      {{ snackbarMessage }}
-      <template v-slot:actions>
-        <v-btn
-          variant="text"
-          @click="snackbar = false"
-        >
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </template>
-    </v-snackbar>
   </v-container>
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 
 export default {
   name: 'LogsView',
   setup() {
+    const route = useRoute();
+    const router = useRouter();
+
     const logs = ref([]);
     const loading = ref(true);
     const search = ref('');
-    const currentPage = ref(1);
+    const currentPage = ref(parseInt(route.query.page) || 1);
     const totalPages = ref(1);
-    const selectedFilter = ref('all');
-    const menuOpen = ref(false);
-    const dialog = ref(false);
-    const dialogType = ref('all');
-    const clearing = ref(false);
-    const snackbar = ref(false);
-    const snackbarMessage = ref('');
-    const snackbarColor = ref('success');
-
-    const dialogTitle = computed(() => {
-      const titulos = {
-        all: 'Eliminar Todos los Registros',
-        error: 'Eliminar Registros de Error',
-        success: 'Eliminar Registros de Éxito',
-        warning: 'Eliminar Registros de Advertencia'
-      };
-      return titulos[dialogType.value] || 'Eliminar Registros';
-    });
+    const itemsPerPage = ref(parseInt(route.query.limit) || 15);
+    const selectedFilter = ref(route.query.estado || 'all');
 
     const filterOptions = [
       { title: 'Todos', value: 'all' },
@@ -285,18 +189,27 @@ export default {
     const viewInvoice = (id) => {
       window.location.href = `/invoices/${id}`;
     };
-    
+
+    const updateUrl = () => {
+      const query = {};
+      if (currentPage.value > 1) query.page = currentPage.value;
+      if (itemsPerPage.value !== 15) query.limit = itemsPerPage.value;
+      if (selectedFilter.value !== 'all') query.estado = selectedFilter.value;
+      router.replace({ query }).catch(() => {});
+    };
+
     const changePage = (page) => {
       currentPage.value = page;
-      loadLogs();
     };
     
     const loadLogs = async () => {
       loading.value = true;
       try {
-        // En una implementación real, usaríamos el filtro seleccionado
-        // Por ahora, solo obtenemos todos los logs
-        const response = await axios.get(`/api/logs?page=${currentPage.value}&limit=15`);
+        const params = new URLSearchParams();
+        params.append('page', currentPage.value);
+        params.append('limit', itemsPerPage.value);
+        if (selectedFilter.value !== 'all') params.append('estado', selectedFilter.value);
+        const response = await axios.get(`/api/logs?${params.toString()}`);
         logs.value = response.data.logs || [];
         totalPages.value = response.data.totalPages || 1;
       } catch (error) {
@@ -333,44 +246,35 @@ export default {
       }
     };
 
-    const confirmClearLogs = (tipo) => {
-      dialogType.value = tipo;
-      dialog.value = true;
-      menuOpen.value = false;
-    };
+    watch(currentPage, () => {
+      updateUrl();
+      loadLogs();
+    });
 
-    const executeClearLogs = async () => {
-      clearing.value = true;
-      try {
-        const response = await axios.delete(`/api/logs/clear?tipo=${dialogType.value}`);
-        
-        snackbarMessage.value = response.data.message;
-        snackbarColor.value = 'success';
-        snackbar.value = true;
-        dialog.value = false;
-        
-        // Recargar logs después de limpiar
-        loadLogs();
-      } catch (error) {
-        console.error('Error al limpiar logs:', error);
-        snackbarMessage.value = error.response?.data?.message || 'Error al limpiar logs';
-        snackbarColor.value = 'error';
-        snackbar.value = true;
-      } finally {
-        clearing.value = false;
-      }
-    };
+    watch(itemsPerPage, () => {
+      currentPage.value = 1;
+      loadLogs();
+    });
+
+    watch(selectedFilter, () => {
+      currentPage.value = 1;
+      updateUrl();
+      loadLogs();
+    });
 
     onMounted(() => {
       loadLogs();
     });
     
     return {
+      route,
+      router,
       logs,
       loading,
       search,
       currentPage,
       totalPages,
+      itemsPerPage,
       selectedFilter,
       filterOptions,
       headers,
@@ -378,17 +282,7 @@ export default {
       getLogStateColor,
       formatDateTime,
       viewInvoice,
-      changePage,
-      menuOpen,
-      dialog,
-      dialogType,
-      dialogTitle,
-      clearing,
-      snackbar,
-      snackbarMessage,
-      snackbarColor,
-      confirmClearLogs,
-      executeClearLogs
+      changePage
     };
   }
 };

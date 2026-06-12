@@ -96,42 +96,6 @@
             <v-icon start color="primary">mdi-receipt-text-outline</v-icon>
             Jobs Recientes
             <v-spacer></v-spacer>
-            <v-menu v-model="menu" :close-on-content-click="false" location="start">
-              <template v-slot:activator="{ props }">
-                <v-btn
-                  color="error"
-                  variant="tonal"
-                  size="small"
-                  v-bind="props"
-                  :loading="clearing"
-                  class="mr-2"
-                >
-                  <v-icon start>mdi-delete-forever</v-icon>
-                  Limpiar
-                  <v-icon end>mdi-menu-down</v-icon>
-                </v-btn>
-              </template>
-              <v-list density="compact">
-                <v-list-item @click="clearJobs('completed')">
-                  <template v-slot:prepend>
-                    <v-icon color="success">mdi-check-circle</v-icon>
-                  </template>
-                  <v-list-item-title>Completados</v-list-item-title>
-                </v-list-item>
-                <v-list-item @click="clearJobs('failed')">
-                  <template v-slot:prepend>
-                    <v-icon color="error">mdi-alert-circle</v-icon>
-                  </template>
-                  <v-list-item-title>Fallidos</v-list-item-title>
-                </v-list-item>
-                <v-list-item @click="clearJobs('all')">
-                  <template v-slot:prepend>
-                    <v-icon color="error">mdi-delete-forever</v-icon>
-                  </template>
-                  <v-list-item-title>Todos</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
             <v-btn
               icon="mdi-refresh"
               variant="text"
@@ -214,46 +178,6 @@
     </v-row>
   </v-container>
 
-  <!-- Diálogo de Confirmación -->
-  <v-dialog v-model="dialog" max-width="400" persistent>
-    <v-card>
-      <v-card-title class="text-h5 d-flex align-center" :class="dialogType === 'all' ? 'bg-error text-white' : 'bg-warning text-black'">
-        <v-icon start>{{ dialogType === 'all' ? 'mdi-alert' : 'mdi-delete-sweep' }}</v-icon>
-        {{ getDialogOption(dialogType)?.title }}
-        <v-spacer></v-spacer>
-        <v-btn
-          icon="mdi-close"
-          size="small"
-          variant="text"
-          @click="dialog = false"
-          :disabled="clearing"
-          :color="dialogType === 'all' ? 'white' : 'black'"
-        ></v-btn>
-      </v-card-title>
-      <v-card-text class="mt-4">
-        {{ getDialogOption(dialogType)?.text }}
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <v-btn
-          color="grey"
-          variant="text"
-          @click="dialog = false"
-          :disabled="clearing"
-        >
-          Cancelar
-        </v-btn>
-        <v-btn
-          :color="dialogType === 'all' ? 'error' : 'warning'"
-          variant="tonal"
-          @click="executeClear"
-          :loading="clearing"
-        >
-          Eliminar
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
 </template>
 
 <script>
@@ -265,10 +189,6 @@ export default {
   data() {
     return {
       loading: false,
-      clearing: false,
-      menu: false,
-      dialog: false,
-      dialogType: null,
       queueStats: {
         facturacion: {},
         kude: {}
@@ -371,63 +291,6 @@ export default {
       })
     },
 
-    getDialogOption(type) {
-      const options = {
-        completed: {
-          title: 'Limpiar Jobs Completados',
-          text: '¿Estás seguro de que deseas eliminar todos los jobs completados? Esta acción no se puede deshacer.',
-          endpoint: '/api/queue/clear-completed'
-        },
-        failed: {
-          title: 'Limpiar Jobs Fallidos',
-          text: '¿Estás seguro de que deseas eliminar todos los jobs fallidos? Esta acción no se puede deshacer.',
-          endpoint: '/api/queue/clear-failed'
-        },
-        all: {
-          title: 'Limpiar TODOS los Jobs',
-          text: '⚠️ ¿Estás SEGURO de que deseas eliminar TODOS los jobs (completados, fallidos, en espera y activos)? Esta acción no se puede deshacer.',
-          endpoint: '/api/queue/clear-all'
-        }
-      }
-      return options[type]
-    },
-
-    clearJobs(type) {
-      // Cerrar menú y abrir diálogo
-      this.menu = false
-      this.dialogType = type
-      this.dialog = true
-    },
-
-    async executeClear() {
-      const option = this.getDialogOption(this.dialogType)
-      if (!option) return
-
-      try {
-        const response = await axios.post(option.endpoint, { queue: 'facturacion' })
-
-        this.$snackbar.show({
-          message: response.data.message,
-          color: 'success',
-          timeout: 3000
-        })
-
-        this.dialog = false
-        this.dialogType = null
-
-        // Recargar datos después de limpiar
-        await this.fetchData()
-      } catch (error) {
-        console.error('Error al limpiar jobs:', error)
-        this.$snackbar.show({
-          message: error.response?.data?.error || 'Error al limpiar jobs',
-          color: 'error',
-          timeout: 5000
-        })
-      } finally {
-        this.clearing = false
-      }
-    }
   }
 }
 </script>

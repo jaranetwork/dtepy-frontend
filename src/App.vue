@@ -74,6 +74,13 @@
           </template>
           <v-list-item-title>Facturas</v-list-item-title>
         </v-list-item>
+        
+        <v-list-item link to="/lotes" :active="route.path.startsWith('/lotes')">
+          <template v-slot:prepend>
+            <v-icon>mdi-package-variant-closed</v-icon>
+          </template>
+          <v-list-item-title>Lotes</v-list-item-title>
+        </v-list-item>
 
         <v-list-item link to="/empresas" :active="route.path === '/empresas'">
           <template v-slot:prepend>
@@ -101,6 +108,13 @@
             <v-icon>mdi-clipboard-text-clock</v-icon>
           </template>
           <v-list-item-title>Registros</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item link to="/mantenimiento" :active="route.path === '/mantenimiento'">
+          <template v-slot:prepend>
+            <v-icon>mdi-wrench</v-icon>
+          </template>
+          <v-list-item-title>Mantenimiento</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
