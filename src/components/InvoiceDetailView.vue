@@ -78,8 +78,8 @@
                       </v-chip>
                     </p>
                     <p><strong>Total:</strong> Gs. {{ formatCurrency(invoice.total) }}</p>
-                    <p><strong>Fecha de Creación:</strong> {{ formatDate(invoice.fechaCreacion) }}</p>
-                    <p v-if="invoice.fechaEnvio"><strong>Fecha de Envío:</strong> {{ formatDate(invoice.fechaEnvio) }}</p>
+<p><strong>Fecha de Creación:</strong> {{ formatDateTime(invoice.fechaCreacion) }}</p>
+<p v-if="invoice.fechaEnvio"><strong>Fecha de Envío:</strong> {{ formatDateTime(invoice.fechaEnvio) }}</p>
                     <p v-if="invoice.fechaProceso"><strong>Fecha de Proceso:</strong> {{ formatDateTime(invoice.fechaProceso) }}</p>
                     <p><strong>Estado en SIFEN:</strong> {{ invoice.estado || 'No disponible' }}</p>
                     <p>

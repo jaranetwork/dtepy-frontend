@@ -549,10 +549,10 @@ export default {
       return new Intl.NumberFormat('es-PY').format(amount);
     };
     
-    const formatDate = (dateString) => {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('es-PY');
-    };
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleString('es-PY');
+};
     
     const viewInvoice = (id) => {
       window.location.href = `/invoices/${id}`;

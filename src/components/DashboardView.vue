@@ -190,7 +190,7 @@ export default {
     const loadStats = async () => {
       try {
         const statsResponse = await axios.get('/api/stats');
-        stats.value = statsResponse.data;
+        stats.value = statsResponse.data.data || statsResponse.data;
 
         // Cargar las facturas recientes
         const invoicesResponse = await axios.get('/api/invoices?page=1&limit=5');

@@ -80,7 +80,7 @@
           </v-card-title>
           <v-card-text>
             <p class="text-body-2 text-medium-emphasis mb-4">
-              Elimina los jobs de la cola de facturación según su estado.
+              Elimina los jobs de las colas de facturación y PDF (KUDE) según su estado.
             </p>
             <v-menu v-model="queueMenuOpen" :close-on-content-click="false" location="end">
               <template v-slot:activator="{ props }">
@@ -367,14 +367,18 @@ export default {
     const executeClearQueue = async () => {
       clearingQueue.value = true;
       try {
-        const endpoints = {
+        const endpoint = {
           completed: '/api/queue/clear-completed',
           failed: '/api/queue/clear-failed',
           all: '/api/queue/clear-all'
-        };
-        const response = await axios.post(endpoints[queueDialogType.value], { queue: 'facturacion' });
+        }[queueDialogType.value];
 
-        snackbarText.value = `✅ ${response.data.message}`;
+        const [facResult, kudeResult] = await Promise.all([
+          axios.post(endpoint, { queue: 'facturacion' }),
+          axios.post(endpoint, { queue: 'kude' })
+        ]);
+
+        snackbarText.value = `✅ ${facResult.data.message} (KUDE: ${kudeResult.data.message})`;
         snackbarColor.value = 'success';
         snackbarIcon.value = 'mdi-check-circle';
         snackbar.value = true;

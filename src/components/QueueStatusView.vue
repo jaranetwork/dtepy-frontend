@@ -3,8 +3,7 @@
     <v-row class="mb-4">
       <v-col cols="12">
         <h1 class="text-h4 font-weight-bold">
-          <v-icon start color="primary">mdi-view-queue</v-icon>
-          Estado de la Cola de Facturación
+          Estado de Cola
         </h1>
         <p class="text-subtitle-1 text-medium-emphasis">
           Monitoreo en tiempo real de procesos asíncronos
@@ -18,7 +17,7 @@
         <v-card variant="outlined" class="mx-auto">
           <v-card-text class="text-center pa-4">
             <v-icon size="48" color="warning" class="mb-2">mdi-clock-outline</v-icon>
-            <div class="text-h3 font-weight-bold">{{ queueStats.facturacion?.waiting || 0 }}</div>
+            <div class="text-h3 font-weight-bold">{{ (queueStats.facturacion?.waiting || 0) + (queueStats.kude?.waiting || 0) }}</div>
             <div class="text-caption text-medium-emphasis">En Espera</div>
           </v-card-text>
         </v-card>
@@ -28,7 +27,7 @@
         <v-card variant="outlined" class="mx-auto">
           <v-card-text class="text-center pa-4">
             <v-icon size="48" color="info" class="mb-2">mdi-cog-outline</v-icon>
-            <div class="text-h3 font-weight-bold">{{ queueStats.facturacion?.active || 0 }}</div>
+            <div class="text-h3 font-weight-bold">{{ (queueStats.facturacion?.active || 0) + (queueStats.kude?.active || 0) }}</div>
             <div class="text-caption text-medium-emphasis">Procesando</div>
           </v-card-text>
         </v-card>
@@ -38,7 +37,7 @@
         <v-card variant="outlined" class="mx-auto">
           <v-card-text class="text-center pa-4">
             <v-icon size="48" color="success" class="mb-2">mdi-check-circle-outline</v-icon>
-            <div class="text-h3 font-weight-bold">{{ queueStats.facturacion?.completed || 0 }}</div>
+            <div class="text-h3 font-weight-bold">{{ (queueStats.facturacion?.completed || 0) + (queueStats.kude?.completed || 0) }}</div>
             <div class="text-caption text-medium-emphasis">Completados</div>
           </v-card-text>
         </v-card>
@@ -48,7 +47,7 @@
         <v-card variant="outlined" class="mx-auto">
           <v-card-text class="text-center pa-4">
             <v-icon size="48" color="error" class="mb-2">mdi-alert-circle-outline</v-icon>
-            <div class="text-h3 font-weight-bold">{{ queueStats.facturacion?.failed || 0 }}</div>
+            <div class="text-h3 font-weight-bold">{{ (queueStats.facturacion?.failed || 0) + (queueStats.kude?.failed || 0) }}</div>
             <div class="text-caption text-medium-emphasis">Fallidos</div>
           </v-card-text>
         </v-card>
@@ -73,7 +72,7 @@
                 >
                   <strong>Worker:</strong> {{ workerStatus === 'active' ? 'En línea' : 'Desconectado' }}
                   <span v-if="workerStatus === 'active'" class="text-caption d-block mt-1">
-                    <strong>Jobs activos:</strong> {{ queueStats.facturacion?.active || 0 }}
+                    <strong>Jobs activos:</strong> Facturación {{ queueStats.facturacion?.active || 0 }} · KUDE {{ queueStats.kude?.active || 0 }}
                   </span>
                 </v-alert>
               </v-col>
@@ -168,8 +167,8 @@
 
             <v-empty-state
               v-if="!loading && jobs.length === 0"
-              title="No hay jobs recientes"
-              text="Los jobs procesados aparecerán aquí"
+               title="No hay jobs recientes"
+               text="Los jobs procesados aparecerán aquí"
               icon="mdi-inbox-outline"
             ></v-empty-state>
           </v-card-text>
