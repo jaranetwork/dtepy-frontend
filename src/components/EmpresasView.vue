@@ -10,7 +10,7 @@
 
           <v-spacer></v-spacer>
 
-          <v-btn color="primary" @click="mostrarDialogoFormulario = true">
+          <v-btn color="primary" @click="nuevaEmpresa">
             <v-icon start>mdi-plus</v-icon>
             Nueva Empresa
           </v-btn>
@@ -27,6 +27,7 @@
               :headers="headers"
               :items="empresasDisplayadas"
               :loading="cargando"
+              items-per-page="-1"
               hide-default-footer
               item-key="_id"
               class="elevation-0"
@@ -36,6 +37,14 @@
                 <v-chip variant="outlined" size="small">
                   <v-icon start size="x-small">mdi-numeric</v-icon>
                   {{ item.ruc }}
+                </v-chip>
+                <v-chip v-if="item.acceso === 'compartida'" size="small" color="teal" variant="tonal" class="ml-1" prepend-icon="mdi-share-variant">
+                  Compartida
+                  <v-tooltip activator="parent">Un administrador te dio acceso a esta empresa y a sus documentos</v-tooltip>
+                </v-chip>
+                <v-chip v-else-if="item.acceso === 'administrador'" size="small" color="error" variant="tonal" class="ml-1" prepend-icon="mdi-shield-crown">
+                  De otro usuario
+                  <v-tooltip activator="parent">La ves y la administrás por ser administrador</v-tooltip>
                 </v-chip>
               </template>
 
@@ -80,7 +89,10 @@
 
               <!-- Acciones -->
               <template #item.acciones="{ item }">
-                <v-menu v-model="item.menuOpen" :close-on-content-click="false" location="start">
+                <v-chip v-if="item.puedeAdministrar === false" size="small" variant="text" prepend-icon="mdi-lock-outline">
+                  Solo el dueño la configura
+                </v-chip>
+                <v-menu v-else v-model="item.menuOpen" :close-on-content-click="false" location="start">
                   <template v-slot:activator="{ props }">
                     <v-btn
                       color="primary"
@@ -121,7 +133,7 @@
                 <div class="text-center py-8">
                   <v-icon size="64" color="grey-lighten-2">mdi-office-building-outline</v-icon>
                   <p class="text-grey mt-2">No hay empresas registradas</p>
-                  <v-btn color="primary" class="mt-2" @click="mostrarDialogoFormulario = true">
+                  <v-btn color="primary" class="mt-2" @click="nuevaEmpresa">
                     <v-icon start>mdi-plus</v-icon>
                     Crear primera empresa
                   </v-btn>
@@ -169,7 +181,7 @@
                   :rules="[
                     v => !!v || 'RUC requerido',
                     v => {
-                      const sinGuiones = v.replace(/[^0-9]/g, '');
+                      const sinGuiones = String(v ?? '').replace(/[^0-9]/g, '');
                       return sinGuiones.length >= 6 && sinGuiones.length <= 12 || 'RUC inválido (6-12 dígitos)';
                     }
                   ]"
@@ -319,6 +331,246 @@
                     <div class="text-caption text-grey mt-1">
                       ℹ️ El CSC es proporcionado por la SET al habilitar la facturación electrónica. Son 32 caracteres hexadecimales.
                     </div>
+                  </v-col>
+
+                  <v-col cols="12" md="4">
+                    <v-text-field
+                      v-model="formulario.configuracionSifen.timbradoFecha"
+                      label="Inicio vigencia timbrado"
+                      type="date"
+                      hint="Fecha dFeIniT de la constancia del timbrado"
+                      persistent-hint
+                      outlined
+                    ></v-text-field>
+                  </v-col>
+
+                  <v-col cols="6" md="4">
+                    <v-text-field
+                      v-model="formulario.configuracionSifen.establecimiento"
+                      label="Establecimiento por defecto"
+                      :rules="[v => !v || /^\d{1,3}$/.test(v) || '1-3 dígitos']"
+                      maxlength="3"
+                      placeholder="001"
+                      hint="Se usa si la factura no trae data.establecimiento"
+                      persistent-hint
+                      outlined
+                    ></v-text-field>
+                  </v-col>
+
+                  <v-col cols="6" md="4">
+                    <v-text-field
+                      v-model="formulario.configuracionSifen.puntoExpedicion"
+                      label="Punto de expedición por defecto"
+                      :rules="[v => !v || /^\d{1,3}$/.test(v) || '1-3 dígitos']"
+                      maxlength="3"
+                      placeholder="001"
+                      hint="Cada punto lleva su numeración correlativa propia"
+                      persistent-hint
+                      outlined
+                    ></v-text-field>
+                  </v-col>
+
+                  <v-col cols="12" md="6">
+                    <v-select
+                      v-model="formulario.configuracionSifen.monedasPermitidas"
+                      label="Monedas permitidas"
+                      :items="[
+                        { title: 'Guaraní (PYG)', value: 'PYG' },
+                        { title: 'Dólar (USD)', value: 'USD' },
+                        { title: 'Real (BRL)', value: 'BRL' },
+                        { title: 'Euro (EUR)', value: 'EUR' },
+                        { title: 'Peso argentino (ARS)', value: 'ARS' }
+                      ]"
+                      multiple
+                      chips
+                      :rules="[v => (v && v.length > 0) || 'Al menos una moneda']"
+                      hint="Política contable: facturas en otra moneda se rechazan"
+                      persistent-hint
+                      outlined
+                    ></v-select>
+                  </v-col>
+                </v-row>
+              </v-col>
+
+              <v-col cols="12" class="bg-grey-lighten-4 pa-4 rounded mt-2">
+                <div class="text-subtitle-1 font-weight-bold mb-1">
+                  <v-icon start color="primary">mdi-store</v-icon>
+                  Datos del Emisor
+                </div>
+                <div class="text-caption text-grey mb-3">
+                  Con estos datos cargados, las integraciones pueden emitir mandando solo cliente + items:
+                  el sistema completa emisor, sucursal, actividades y numeración automáticamente.
+                </div>
+
+                <v-row>
+                  <v-col cols="12" md="6">
+                    <v-select
+                      v-model="formulario.tipoContribuyente"
+                      label="Tipo de contribuyente"
+                      :items="[
+                        { title: 'Persona Física', value: 1 },
+                        { title: 'Persona Jurídica', value: 2 }
+                      ]"
+                      clearable
+                      outlined
+                    ></v-select>
+                  </v-col>
+
+                  <v-col cols="12" md="6">
+                    <v-select
+                      v-model="formulario.tipoRegimen"
+                      label="Tipo de régimen"
+                      :items="[
+                        { title: '1 - Régimen de Turismo', value: 1 },
+                        { title: '2 - Importador', value: 2 },
+                        { title: '3 - Exportador', value: 3 },
+                        { title: '4 - Maquila', value: 4 },
+                        { title: '5 - Ley 60/90', value: 5 },
+                        { title: '6 - Régimen del Pequeño Productor', value: 6 },
+                        { title: '7 - Régimen del Mediano Productor', value: 7 },
+                        { title: '8 - Régimen Contable', value: 8 }
+                      ]"
+                      clearable
+                      outlined
+                    ></v-select>
+                  </v-col>
+
+                  <v-col cols="12">
+                    <div class="text-subtitle-2 font-weight-bold mb-2">Actividades económicas</div>
+                    <v-row v-for="(act, i) in formulario.actividadesEconomicas" :key="'act-' + i" dense>
+                      <v-col cols="4" md="3">
+                        <v-text-field v-model="act.codigo" label="Código" placeholder="46520" density="compact" outlined></v-text-field>
+                      </v-col>
+                      <v-col cols="7" md="8">
+                        <v-text-field v-model="act.descripcion" label="Descripción" density="compact" outlined></v-text-field>
+                      </v-col>
+                      <v-col cols="1" class="d-flex align-center">
+                        <v-btn icon size="small" color="error" variant="text" @click="quitarActividad(i)">
+                          <v-icon>mdi-delete</v-icon>
+                        </v-btn>
+                      </v-col>
+                    </v-row>
+                    <v-btn size="small" variant="tonal" color="primary" @click="agregarActividad">
+                      <v-icon start>mdi-plus</v-icon> Agregar actividad
+                    </v-btn>
+                  </v-col>
+
+                  <v-col cols="12">
+                    <div class="text-subtitle-2 font-weight-bold mb-2">Establecimientos (sucursales)</div>
+                    <v-card
+                      v-for="(est, i) in formulario.establecimientos"
+                      :key="'est-' + i"
+                      variant="outlined"
+                      class="pa-3 mb-3"
+                    >
+                      <v-row dense>
+                        <v-col cols="4" md="2">
+                          <v-text-field v-model="est.codigo" label="Código *" placeholder="001" maxlength="3" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="8" md="5">
+                          <v-text-field v-model="est.denominacion" label="Denominación *" placeholder="Casa Matriz" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="8" md="4">
+                          <v-text-field v-model="est.direccion" label="Dirección" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="4" md="1">
+                          <v-text-field v-model="est.numeroCasa" label="N° casa" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="4" md="2">
+                          <v-text-field v-model.number="est.departamento" label="Depto (cód)" type="number" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="8" md="4">
+                          <v-text-field v-model="est.departamentoDescripcion" label="Departamento" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="4" md="2">
+                          <v-text-field v-model.number="est.distrito" label="Distrito (cód)" type="number" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="8" md="4">
+                          <v-text-field v-model="est.distritoDescripcion" label="Distrito" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="4" md="2">
+                          <v-text-field v-model.number="est.ciudad" label="Ciudad (cód)" type="number" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="8" md="4">
+                          <v-text-field v-model="est.ciudadDescripcion" label="Ciudad" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="6" md="3">
+                          <v-text-field v-model="est.telefono" label="Teléfono" density="compact" outlined></v-text-field>
+                        </v-col>
+                        <v-col cols="6" md="3">
+                          <v-text-field v-model="est.email" label="Email" density="compact" outlined></v-text-field>
+                        </v-col>
+                      </v-row>
+                      <v-btn size="small" color="error" variant="text" @click="quitarEstablecimiento(i)">
+                        <v-icon start>mdi-delete</v-icon> Quitar establecimiento
+                      </v-btn>
+                    </v-card>
+                    <v-btn size="small" variant="tonal" color="primary" @click="agregarEstablecimiento">
+                      <v-icon start>mdi-plus</v-icon> Agregar establecimiento
+                    </v-btn>
+                    <div class="text-caption text-grey mt-2">
+                      ℹ️ Los códigos deben coincidir con los habilitados en el timbrado ante la DNIT.
+                    </div>
+                  </v-col>
+                </v-row>
+              </v-col>
+
+              <v-col cols="12" class="bg-grey-lighten-4 pa-4 rounded mt-2">
+                <div class="text-subtitle-1 font-weight-bold mb-1">
+                  <v-icon start color="primary">mdi-bell-ring</v-icon>
+                  Notificaciones
+                </div>
+                <div class="text-caption text-grey mb-3">
+                  Avisos automáticos cuando una factura llega a estado final (aprobada/rechazada).
+                </div>
+
+                <v-row>
+                  <v-col cols="12" md="7">
+                    <v-text-field
+                      v-model="formulario.notificaciones.webhookUrl"
+                      label="Webhook URL"
+                      placeholder="https://miweb.com/api/webhook-facturas"
+                      hint="POST firmado (HMAC) con el resultado y links de PDF/XML. Vacío = desactivado"
+                      persistent-hint
+                      outlined
+                    ></v-text-field>
+                  </v-col>
+
+                  <v-col cols="12" md="5">
+                    <v-text-field
+                      v-model="formulario.notificaciones.webhookSecret"
+                      label="Webhook Secret"
+                      hint="Para verificar la firma X-DTE-Firma. Se genera solo si queda vacío"
+                      persistent-hint
+                      :type="mostrarSecret ? 'text' : 'password'"
+                      :append-inner-icon="mostrarSecret ? 'mdi-eye-off' : 'mdi-eye'"
+                      @click:append-inner="mostrarSecret = !mostrarSecret"
+                      outlined
+                    ></v-text-field>
+                  </v-col>
+
+                  <v-col cols="12" md="6">
+                    <v-switch
+                      v-model="formulario.notificaciones.emailAutomatico"
+                      color="primary"
+                      label="Enviar KUDE por email al cliente automáticamente al aprobarse"
+                      hint="Usa el proveedor SMTP seleccionado; sin proveedor, el SMTP del servidor"
+                      persistent-hint
+                    ></v-switch>
+                  </v-col>
+
+                  <v-col cols="12" md="6">
+                    <v-select
+                      v-model="formulario.notificaciones.smtpProviderId"
+                      label="Proveedor SMTP"
+                      :items="opcionesSmtp"
+                      item-title="title"
+                      item-value="value"
+                      clearable
+                      hint="Se gestionan en la sección Proveedores SMTP. Vacío = SMTP del servidor"
+                      persistent-hint
+                      outlined
+                    ></v-select>
                   </v-col>
                 </v-row>
               </v-col>
@@ -527,31 +779,59 @@ export default {
     const formRef = ref(null);
     const formularioValido = ref(false);
     const empresaEnEdicion = ref(null);
-    const formulario = ref({
+    const formularioVacio = () => ({
       ruc: '',
       nombreFantasia: '',
       razonSocial: '',
       direccion: '',
       telefono: '',
       email: '',
+      tipoContribuyente: 2,
+      tipoRegimen: null,
+      actividadesEconomicas: [],
+      establecimientos: [],
+      notificaciones: { webhookUrl: '', webhookSecret: '', emailAutomatico: false, smtpProviderId: null },
       configuracionSifen: {
         timbrado: '12345678',
         idCSC: '0001',
         csc: '',
         modo: 'test',
         urlLogo: '',
-        envioFacturas: 'normal'
+        envioFacturas: 'normal',
+        timbradoFecha: '',
+        establecimiento: '001',
+        puntoExpedicion: '001',
+        monedasPermitidas: ['PYG', 'USD']
       }
     });
+    const formulario = ref(formularioVacio());
     
     // Certificado
     const archivoCertificado = ref(null);
     const contrasenaCertificado = ref('');
     const mostrarContrasena = ref(false);
     const mostrarCSC = ref(false);
+    const mostrarSecret = ref(false);
     
     // Empresa seleccionada
     const empresaSeleccionada = ref(null);
+
+    // Proveedores SMTP disponibles (para el selector de notificaciones)
+    const smtpProviders = ref([]);
+    const opcionesSmtp = computed(() =>
+      smtpProviders.value.map((p) => ({
+        title: `${p.nombre} (${p.host})${p.activo ? '' : ' — inactivo'}`,
+        value: p._id
+      }))
+    );
+    const cargarSmtpProviders = async () => {
+      try {
+        const response = await axios.get('/api/smtp-providers', { params: { _t: Date.now() } });
+        smtpProviders.value = response.data.data || [];
+      } catch (error) {
+        console.error('❌ Error cargando proveedores SMTP:', error);
+      }
+    };
     
     // Snackbar
     const snackbar = ref(false);
@@ -598,7 +878,7 @@ export default {
         console.log('✅ Empresas cargadas:', empresas.value.length);
       } catch (error) {
         console.error('❌ Error cargando empresas:', error);
-        mostrarSnackbar('Error cargando empresas: ' + error.message, 'error');
+        mostrarSnackbar('Error cargando empresas: ' + (error.response?.data?.message || error.response?.data?.error || error.message), 'error');
       } finally {
         cargando.value = false;
       }
@@ -621,13 +901,22 @@ export default {
         direccion: '',
         telefono: '',
         email: '',
+        tipoContribuyente: 2,
+        tipoRegimen: null,
+        actividadesEconomicas: [],
+        establecimientos: [],
+        notificaciones: { webhookUrl: '', webhookSecret: '', emailAutomatico: false, smtpProviderId: null },
         configuracionSifen: {
           timbrado: '12345678',
           idCSC: '0001',
           csc: '',
           modo: 'test',
           urlLogo: '',
-          envioFacturas: 'normal'
+          envioFacturas: 'normal',
+          timbradoFecha: '',
+          establecimiento: '001',
+          puntoExpedicion: '001',
+          monedasPermitidas: ['PYG', 'USD']
         }
       };
       mostrarDialogoFormulario.value = true;
@@ -643,16 +932,50 @@ export default {
         direccion: empresa.direccion || '',
         telefono: empresa.telefono || '',
         email: empresa.email || '',
+        tipoContribuyente: empresa.tipoContribuyente ?? 2,
+        tipoRegimen: empresa.tipoRegimen ?? null,
+        actividadesEconomicas: JSON.parse(JSON.stringify(empresa.actividadesEconomicas || [])),
+        establecimientos: JSON.parse(JSON.stringify(empresa.establecimientos || [])),
+        notificaciones: {
+          webhookUrl: empresa.notificaciones?.webhookUrl || '',
+          webhookSecret: empresa.notificaciones?.webhookSecret || '',
+          emailAutomatico: empresa.notificaciones?.emailAutomatico || false,
+          smtpProviderId: empresa.notificaciones?.smtpProviderId || null
+        },
         configuracionSifen: {
           timbrado: empresa.configuracionSifen?.timbrado || '12345678',
           idCSC: empresa.configuracionSifen?.idCSC || '0001',
           csc: empresa.configuracionSifen?.csc || '',
           modo: empresa.configuracionSifen?.modo || 'test',
           urlLogo: empresa.configuracionSifen?.urlLogo || '',
-          envioFacturas: empresa.configuracionSifen?.envioFacturas || 'normal'
+          envioFacturas: empresa.configuracionSifen?.envioFacturas || 'normal',
+          timbradoFecha: empresa.configuracionSifen?.timbradoFecha || '',
+          establecimiento: empresa.configuracionSifen?.establecimiento || '001',
+          puntoExpedicion: empresa.configuracionSifen?.puntoExpedicion || '001',
+          monedasPermitidas: [...(empresa.configuracionSifen?.monedasPermitidas || ['PYG', 'USD'])]
         }
       };
       mostrarDialogoFormulario.value = true;
+    };
+
+    // Filas dinámicas: actividades económicas y establecimientos
+    const agregarActividad = () => {
+      formulario.value.actividadesEconomicas.push({ codigo: '', descripcion: '' });
+    };
+    const quitarActividad = (i) => {
+      formulario.value.actividadesEconomicas.splice(i, 1);
+    };
+    const agregarEstablecimiento = () => {
+      formulario.value.establecimientos.push({
+        codigo: '', denominacion: '', direccion: '', numeroCasa: '',
+        departamento: null, departamentoDescripcion: '',
+        distrito: null, distritoDescripcion: '',
+        ciudad: null, ciudadDescripcion: '',
+        telefono: '', email: ''
+      });
+    };
+    const quitarEstablecimiento = (i) => {
+      formulario.value.establecimientos.splice(i, 1);
     };
     
     // Cerrar formulario
@@ -666,10 +989,9 @@ export default {
     
     // Guardar empresa
     const guardarEmpresa = async () => {
-      if (!formRef.value || !formularioValido.value) {
-        formRef.value?.validate();
-        return;
-      }
+      if (!formRef.value) return;
+      const { valid } = await formRef.value.validate();
+      if (!valid) return;
       
       guardando.value = true;
       try {
@@ -778,8 +1100,11 @@ export default {
       }
     };
     
-    // Cargar empresas al montar
-    onMounted(cargarEmpresas);
+    // Cargar empresas y proveedores SMTP al montar
+    onMounted(() => {
+      cargarEmpresas();
+      cargarSmtpProviders();
+    });
     
     return {
       // Estado
@@ -805,9 +1130,13 @@ export default {
       contrasenaCertificado,
       mostrarContrasena,
       mostrarCSC,
+      mostrarSecret,
 
       // Empresa seleccionada
       empresaSeleccionada,
+
+      // Proveedores SMTP
+      opcionesSmtp,
       
       // Dependencias
       dependencias,
